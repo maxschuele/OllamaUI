@@ -1,0 +1,15 @@
+# Ignore all saved chat files
+saved_chats/
+
+# Ignore IDE and editor settings files (example: PyCharm, VSCode)
+.idea/
+.vscode/
+
+# Ignore Python cache files and folders
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore build-related or test files
+Build_command.txt
+Test.py
