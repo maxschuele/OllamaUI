@@ -4,6 +4,7 @@ import os
 import ollama
 from ollama import AsyncClient
 import asyncio
+from pathlib import Path
 
 from utils import utils
 
@@ -15,6 +16,10 @@ class OllamaCall:
         self.name_current_chat = ""
         self.unsaved_text = []
         self.UI = None
+        self.files = []
+        self.processed_files = []
+
+
 
     async def send_message(self, prompt):
         # Append the user's message to the conversation history
@@ -38,8 +43,31 @@ class OllamaCall:
         self.save_chat_entry()
 
 
+    def upload_file(self, file_path):
+        if Path(file_path).suffix.lower() == '.pdf':
+            self.files.append(file_path)
+            pdf_content = utils.read_PDF(file_path)
+            self.processed_files.append({"file": file_path,"type": '.pdf', "content": pdf_content})
+
+
     def create_message(self, prompt):
         context = ""
+        file_content = ""
+        if self.files:
+            for file in self.processed_files:
+                if file['type']=='.pdf':
+
+                    file_content += (
+                    "This PDF document has been uploaded and processed to extract its content. "
+                    "The following text may contain formatting irregularities, especially in tables, formulas, or structured layouts. "
+                    "Please focus on summarizing the main points, important findings, key concepts, and relevant details of the document. "
+                    "Ignore less relevant parts like References, bibliographies, or sections focused solely on citations unless specifically asked. "
+                    "If the document appears to be technical, highlight the core methodology, findings, and conclusions. "
+                    "For non-technical documents, emphasize the primary topics, arguments, and takeaways. "
+                    "Here is the content of the file:\n\n" + file['content']
+                    )
+
+
 
         if self.current_chat:
             # Instruction to treat the following conversation as context only
@@ -53,7 +81,7 @@ class OllamaCall:
                 context+=old_conv['role'] + ": " + old_conv['content'] + "\n"
 
             context += ") End of context.\n Now, answer the following question:\n"
-        message = context + prompt
+        message = context + prompt + file_content
         return [{'role': 'user', 'content': message}]
 
 
@@ -78,6 +106,8 @@ class OllamaCall:
         # Define the file path
         utils.save_chat_entry(self.name_current_chat, self.unsaved_text)
         self.unsaved_text = []
+        if self.files:
+            utils.store_submitted_files(self.files, self.name_current_chat)
         if new_name:
             self.UI.load_chat_files()
 
@@ -88,7 +118,10 @@ class OllamaCall:
             self.save_chat_entry()
         # Clears the conversation history
         self.current_chat = []
+        self.files = []
         self.name_current_chat = ""
+        self.UI.file_chips.controls.clear()
+        self.UI.page.update()
 
     def new_chat(self):
         self.reset_chat()
@@ -105,7 +138,8 @@ class OllamaCall:
         # Load chat lines and populate current_chat
         for message in utils.load_chat_file(file_path):
             self.current_chat.append(message)
-
+        self.files = utils.load_submitted_files(os.path.join("saved_chats", file_name.replace(".txt", ".pkl")))
+        self.UI.process_files(self.files)
         # Set the current chat name
         self.name_current_chat = file_name.replace(".txt", "")
 

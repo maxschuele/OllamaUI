@@ -5,6 +5,9 @@ import subprocess
 import sys
 import asyncio
 import httpx
+import fitz
+import re
+import pickle
 
 
 async def setup(page: ft.Page):
@@ -63,6 +66,45 @@ async def setup(page: ft.Page):
     status_text.value = "Setup completed successfully!"
     setup_dialog.actions = [ft.TextButton("Close", on_click=lambda e: page.close(setup_dialog))]
     page.update()
+
+def read_PDF(pdf_path):
+    text = ""
+    with fitz.open(pdf_path) as pdf:
+        for page_num in range(pdf.page_count):
+            page = pdf[page_num]
+            text += page.get_text("text")  # Extract text from each page
+    text = re.sub(r'\n+', '\n', text)
+    text = re.sub(r' +', ' ', text)
+    return text
+
+def store_submitted_files(file_paths, filename):
+    """
+    The path of files that are still active in this chat are stored. When the chat is activated again,
+    the files will be loaded. When the file is not available anymore, the path will be deleted.
+    """
+
+    with open(os.path.join("saved_chats", filename+".pkl"), "wb") as f:
+        pickle.dump(file_paths, f)
+
+
+def load_submitted_files(file_path):
+    """
+    Loads file paths from a pickle file if it exists. If the file does not exist,
+    returns an empty list. Also filters out any paths in the list that are no longer
+    available on the filesystem.
+    """
+
+    # Check if the file exists
+    if not os.path.exists(file_path):
+        return []
+
+    with open(file_path, "rb") as f:
+        file_paths = pickle.load(f)
+
+    # Filter out paths that no longer exist
+    valid_file_paths = [path for path in file_paths if os.path.exists(path)]
+
+    return valid_file_paths
 
 
 def exit_program(page):
